@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>title</title>
+    <style>
+      pre {
+        margin: 0;
+      }
+    </style>
+    <script>
+      window.addEventListener('paste', handlePasteAndDrop);
+      window.addEventListener('dragenter', function(event){event.preventDefault();});
+      window.addEventListener('dragover', function(event){event.preventDefault();});
+      window.addEventListener('drop', handlePasteAndDrop);
+      function handlePasteAndDrop(event) {
+        event.preventDefault();
+        var clipboardData = event.dataTransfer || event.clipboardData || window.clipboardData;
+        if (clipboardData.types) {
+          for (var i = 0; i < clipboardData.types.length; i++) {
+            var type = clipboardData.types[i];
+            console.log('Clipboard data type: ' + type);
+            console.log('Clipboard data get data: ' + clipboardData.getData(type));
+          }
+        }
+        if (clipboardData.items) {
+          for (var i = 0; i < clipboardData.items.length; i++) {
+            var item = clipboardData.items[i];
+            console.log('Clipboard data item type: ' + item.type);
+            console.log('Clipboard data item kind: ' + item.kind);
+            if (item.kind === 'file') {
+              console.log('Clipboard data item get as file name: ' + item.getAsFile().name);
+              var file = item.getAsFile();
+              var reader = new FileReader();
+
+              reader.onload = (function(e) {
+                var view = new Uint8Array(e.target.result);
+                var str = '';
+                for (var i = 0; i < 16; i++) {
+                  str += hex(view[i]) + ' ';
+                }
+                console.log(str);
+              });
+
+              reader.readAsArrayBuffer(file);
+            } else {
+              item.getAsString(function(s) {console.log('Clipboard data item get as string: ' + s)});
+            }
+          }
+        }
+        for (var i = 0; i < clipboardData.files.length; i++) {
+          var file = clipboardData.files[i];
+          console.log('Clipboard data file type: ' + file.type);
+          console.log('Clipboard data file get as string: ' + file.name);
+          var reader = new FileReader();
+
+          reader.onload = (function(e) {
+            var view = new DataView(e.target.result);
+            var i = 0;
+            hexSubString(view, 0, 8); // Header
+            i += 8;
+            while (i < view.byteLength) {
+              hexSubString(view, i, 16);
+              i += view.getUint32(i) + 12; // Plus chunk meta
+            }
+          });
+
+          reader.readAsArrayBuffer(file);
+        }
+      }
+      function hexSubString(view, start, len) {
+        var end = Math.min(start + len, view.byteLength);
+        for (var i = start; i < end; i+=16) {
+          hexString(view, i, Math.min(16, end - i));
+        }
+      }
+      function hexString(view, start, len) {
+        var strH = '';
+        var strC = '';
+        var strA = '';
+        strA = hex(start, 24);
+        for (var i = start; i < start + len; i++) {
+          var b = view.getUint8(i);
+          strH += hex(b) + ' ';
+          if (b > 31 && b < 127) {
+            strC += String.fromCharCode(b);
+          } else {
+            strC += '.';
+          }
+        }
+        while (strH.length < 16*3) {
+          strH += '   ';
+        }
+        document.getElementById('hex').insertAdjacentHTML('beforebegin', '<pre>' + strA + '  ' + strH + '  ' + strC + '</pre>')
+        console.log(strA + '  ' + strH + '  ' + strC);
+      }
+      function hex(x, l) {
+        if (l !== 8 && l !== 16 && l !== 24 && l !== 32) l = 8;
+        var y = x.toString(16).toUpperCase();
+        while (y.length < l / 4) {
+          y = '0' + y;
+        }
+        return y;
+      }
+    </script>
+  </head>
+  <body contenteditable="true">
+    <div id="hex">a</div>
+  </body>
+</html>
