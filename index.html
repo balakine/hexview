@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>title</title>
+    <style>
+      pre {
+        margin: 0;
+      }
+    </style>
+    <script>
+      window.addEventListener('paste', handlePasteAndDrop);
+      window.addEventListener('dragenter', function(event){event.preventDefault();});
+      window.addEventListener('dragover', function(event){event.preventDefault();});
+      window.addEventListener('drop', handlePasteAndDrop);
+      function handlePasteAndDrop(event) {
+        event.preventDefault();
+        var dataTransfer = event.dataTransfer || event.clipboardData || window.clipboardData;
+        for (var i = 0; i < dataTransfer.files.length; i++) {
+          var file = dataTransfer.files[i];
+          console.log('Clipboard data file type: ' + file.type);
+          console.log('Clipboard data file get as string: ' + file.name);
+          var reader = new FileReader();
+
+          reader.onload = (function(e) {
+            var view = new DataView(e.target.result);
+            var i = 0;
+            if (viewToString(view, 0, 8) === String.fromCharCode(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)) {
+              hexSubString(view, 0, 8); // PNG Header
+              i += 8;
+              while (i < view.byteLength) {
+                getChunk(view, i, 16);
+                i += view.getUint32(i) + 12; // Plus chunk meta
+              }
+            } else {
+              hexSubString(view, 0, 64);
+            }
+          });
+
+          reader.readAsArrayBuffer(file);
+        }
+      }
+      function getChunk(view, start) {
+        if (viewToString(view, start + 4, 4) === 'IHDR') {
+          var i = start;
+          hexSubString(view, i, 4, 'Chunk length'); i+=4;
+          hexSubString(view, i, 4, 'Chunk type'); i+=4;
+          hexSubString(view, i, 4, 'Image width'); i+=4;
+          hexSubString(view, i, 4, 'Image height'); i+=4;
+          hexSubString(view, i, 1, 'Bit depth'); i+=1;
+          hexSubString(view, i, 1, 'Color type'); i+=1;
+          hexSubString(view, i, 1, 'Compression method'); i+=1;
+          hexSubString(view, i, 1, 'Filter method'); i+=1;
+          hexSubString(view, i, 1, 'Interlace method'); i+=1;
+          hexSubString(view, i, 4, 'CRC'); i+=4;
+        } else {
+          hexSubString(view, start, 16);
+        }
+      }
+      function hexSubString(view, start, len, comment) {
+        var end = Math.min(start + len, view.byteLength);
+        for (var i = start; i < end; i+=16) {
+          var str = hexString(view, i, Math.min(16, end - i));
+          if (comment !== undefined) str += '  // ' + comment;
+          document.getElementById('hex').insertAdjacentHTML('beforebegin', '<pre>' + str + '</pre>')
+          console.log(str);
+        }
+      }
+      function hexString(view, start, len) {
+        var strH = '';
+        var strC = '';
+        var strA = '';
+        strA = hex(start, 24);
+        for (var i = start; i < start + len; i++) {
+          var b = view.getUint8(i);
+          strH += hex(b) + ' ';
+          if (b > 31 && b < 127) {
+            strC += String.fromCharCode(b);
+          } else {
+            strC += '.';
+          }
+        }
+        while (strH.length < 16*3) {
+          strH += '   ';
+          strC += ' ';
+        }
+        return strA + '  ' + strH + '  ' + strC;
+      }
+      function hex(x, l) {
+        if (l !== 8 && l !== 16 && l !== 24 && l !== 32) l = 8;
+        var y = x.toString(16).toUpperCase();
+        while (y.length < l / 4) {
+          y = '0' + y;
+        }
+        return y;
+      }
+      function viewToString(view, start, len) {
+        var strC = '';
+        var end = Math.min(start + len, view.byteLength);
+        for (var i = start; i < end; i++) {
+          var b = view.getUint8(i);
+          strC += String.fromCharCode(b);
+        }
+        return strC;
+      }
+    </script>
+  </head>
+  <body contenteditable="true">
+    <div id="hex">a</div>
+  </body>
+</html>
